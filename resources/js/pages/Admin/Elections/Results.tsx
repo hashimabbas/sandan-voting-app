@@ -42,11 +42,17 @@ interface CandidateResult {
     votes_count: number;
 }
 
+interface VoteEntry {
+    candidate_name: string;
+    unit_name: string;
+    count: number;
+}
+
 interface VoterLogEntry {
     name: string;
     phone: string;
     weight: number;
-    votes: { candidate_name: string; unit_name: string }[];
+    votes: VoteEntry[];
 }
 
 interface AdminElectionResultsProps {
@@ -54,6 +60,8 @@ interface AdminElectionResultsProps {
     results: CandidateResult[];
     totalPossibleVotes: number;
     totalVotesCast: number;
+    transferredWeight: number;
+    untransferredCount: number;
     voters: VoterLogEntry[];
     generated_at: string;
     breadcrumbs: BreadcrumbItem[];
@@ -85,7 +93,7 @@ function formatDate(date: Date): string {
 }
 
 export default function Results() {
-    const { election, results, totalPossibleVotes, totalVotesCast, voters, generated_at, breadcrumbs, flash } =
+    const { election, results, totalPossibleVotes, totalVotesCast, transferredWeight, untransferredCount, voters, generated_at, breadcrumbs, flash } =
         usePage<AdminElectionResultsProps>().props;
     const [showDashboard, setShowDashboard] = useState(false);
 
@@ -229,19 +237,19 @@ export default function Results() {
             </div>
 
             {/* ===== GOVERNMENT DOCUMENT ===== */}
-            <div className="min-h-screen bg-white" dir="rtl">
-                <div className="max-w-[210mm] mx-auto px-8 py-12 md:py-16 print:px-0 print:py-0">
+            <div className="min-h-screen bg-white print:min-h-0" dir="rtl">
+                <div className="max-w-[210mm] mx-auto px-8 py-12 md:py-16 print:max-w-none print:w-full print:px-0 print:py-0">
 
                     {/* --- Document Header --- */}
                     <div className="border-b-2 border-slate-900 pb-8 mb-10 print:border-b print:border-slate-900">
                         <div className="flex items-center justify-between">
-                            {/* Right: Emblem + Government Name */}
+                            {/* Right: Association Name */}
                             <div className="flex items-center gap-4">
                                 <OmaniEmblem size="lg" />
                                 <div>
-                                    <h1 className="text-2xl font-bold text-slate-900">سلطنة عُمان</h1>
-                                    <p className="text-sm text-slate-600 font-medium mt-0.5">وزارة الإسكان والتخطيط العمراني</p>
-                                    <p className="text-xs text-slate-400 mt-0.5">– نتائج الانتخابات –</p>
+                                    <h1 className="text-xl font-bold text-slate-900">جمعية ملاك مدينة سندان الصناعية</h1>
+                                    <p className="text-sm text-slate-600 font-medium mt-0.5">Sandan Industrial City Owners Association</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">– تقرير نتائج التصويت الإلكتروني –</p>
                                 </div>
                             </div>
                             {/* Left: Reference + Date */}
@@ -312,6 +320,101 @@ export default function Results() {
                         </table>
                     </div>
 
+                    {/* --- Purpose of Voting --- */}
+                    <div className="mb-10">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-1 h-8 bg-slate-900 rounded-full" />
+                            <h3 className="text-xl font-black text-slate-900">الهدف من التصويت</h3>
+                        </div>
+                        <p className="text-sm text-slate-700 leading-relaxed">
+                            تم إجراء عملية التصويت الإلكتروني الخاصة بـ <strong>{election.title}</strong> لغرض انتخاب أعضاء مجلس الإدارة / اعتماد القرارات المدرجة بجدول أعمال الجمعية العمومية.
+                        </p>
+                    </div>
+
+                    {/* --- System Description --- */}
+                    <div className="mb-10">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-1 h-8 bg-slate-900 rounded-full" />
+                            <h3 className="text-xl font-black text-slate-900">نظام التصويت الإلكتروني</h3>
+                        </div>
+                        <div className="space-y-4 text-sm text-slate-700 leading-relaxed">
+                            <p>
+                                <strong>آلية التحقق</strong><br />
+                                اعتمد النظام على آلية تحقق متعددة العوامل، بحيث يشترط إدخال عاملين تحقق على الأقل من البيانات المعتمدة مسبقًا للمالك (رقم الوحدة، الرقم المدني، رقم الهاتف).
+                            </p>
+                            <p>
+                                <strong>أهلية التصويت</strong><br />
+                                اقتصر التصويت على الوحدات المحولة ملكيتها (Transferred Ownership) وفق السجلات المعتمدة.
+                            </p>
+                            <p>
+                                <strong>منع التكرار</strong><br />
+                                لا يسمح النظام بتجاوز الوزن التصويتي المخصص لكل مالك أو التصويت المتكرر لنفس الحصة العقارية.
+                            </p>
+                            <p>
+                                <strong>التحكم الزمني</strong><br />
+                                تم تفعيل التصويت خلال فترة زمنية محددة مسبقًا، ويمنع النظام الإدلاء بالأصوات خارج المدة المعتمدة.
+                            </p>
+                            <p>
+                                <strong>السجلات</strong><br />
+                                يحتفظ النظام بسجلات إلكترونية كاملة لعمليات التصويت تشمل وقت الإدلاء بالصوت، بيانات الوحدة، والعملية الانتخابية المرتبطة.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* --- Voting Methodology --- */}
+                    <div className="mb-10">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-1 h-8 bg-slate-900 rounded-full" />
+                            <h3 className="text-xl font-black text-slate-900">منهجية احتساب الأصوات</h3>
+                        </div>
+                        <p className="text-sm text-slate-700 leading-relaxed">
+                            تم احتساب القوة التصويتية لكل مالك وفق عدد الوحدات العقارية المسجلة باسمه والمعتمدة ضمن سجل الناخبين، بحيث يمثل كل حق ملكية صوتًا مستقلاً. يُحتسب الوزن التصويتي بناءً على إجمالي عدد الوحدات المملوكة لكل ناخب، ولا يُسمح بتجاوز هذا الوزن.
+                        </p>
+                    </div>
+
+                    {/* --- Official Statistics --- */}
+                    <div className="mb-10">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-1 h-8 bg-slate-900 rounded-full" />
+                            <h3 className="text-xl font-black text-slate-900">الإحصائيات الرسمية</h3>
+                        </div>
+
+                        <table className="w-full border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-slate-900 text-white">
+                                    <th className="py-3 px-4 font-bold text-right">البيان</th>
+                                    <th className="py-3 px-4 font-bold text-center">العدد</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="border-b border-slate-100">
+                                    <td className="py-3 px-4 text-slate-700">إجمالي الوزن التصويتي</td>
+                                    <td className="py-3 px-4 text-center font-bold text-slate-900">{totalPossibleVotes.toLocaleString()}</td>
+                                </tr>
+                                <tr className="border-b border-slate-100">
+                                    <td className="py-3 px-4 pr-10 text-slate-500 text-xs">— الوحدات المنقولة (أصوات المالكين)</td>
+                                    <td className="py-3 px-4 text-center font-bold text-slate-700">{transferredWeight.toLocaleString()}</td>
+                                </tr>
+                                <tr className="border-b border-slate-100">
+                                    <td className="py-3 px-4 pr-10 text-slate-500 text-xs">— الوحدات غير المحولة (تصويت إداري)</td>
+                                    <td className="py-3 px-4 text-center font-bold text-slate-700">{untransferredCount.toLocaleString()}</td>
+                                </tr>
+                                <tr className="border-b border-slate-100">
+                                    <td className="py-3 px-4 text-slate-700">إجمالي الأصوات المصوتة</td>
+                                    <td className="py-3 px-4 text-center font-bold text-slate-900">{totalVotesCast.toLocaleString()}</td>
+                                </tr>
+                                <tr className="border-b border-slate-100">
+                                    <td className="py-3 px-4 text-slate-700">عدد المشاركين</td>
+                                    <td className="py-3 px-4 text-center font-bold text-slate-900">{voters.length.toLocaleString()}</td>
+                                </tr>
+                                <tr className="bg-emerald-50">
+                                    <td className="py-3 px-4 font-bold text-emerald-700">نسبة المشاركة</td>
+                                    <td className="py-3 px-4 text-center font-bold text-emerald-700">{participationRate}%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
                     {/* --- Final Results Section --- */}
                     <div className="mb-10">
                         <div className="flex items-center gap-3 mb-6">
@@ -323,9 +426,9 @@ export default function Results() {
                             <thead>
                                 <tr className="bg-slate-900 text-white">
                                     <th className="py-3 px-4 font-bold text-center w-12">#</th>
-                                    <th className="py-3 px-4 font-bold text-right">اسم المرشح</th>
+                                    <th className="py-3 px-4 font-bold text-right">المرشح</th>
                                     <th className="py-3 px-4 font-bold text-center">عدد الأصوات</th>
-                                    <th className="py-3 px-4 font-bold text-center">النسبة المئوية</th>
+                                    <th className="py-3 px-4 font-bold text-center">النسبة</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -355,6 +458,10 @@ export default function Results() {
                                 })}
                             </tbody>
                         </table>
+
+                        <p className="text-sm text-slate-600 mt-4 leading-relaxed">
+                            وبناءً على النتائج النهائية المعتمدة، فقد فاز المرشحون الأعلى حصولًا على الأصوات وفق النظام الأساسي للجمعية.
+                        </p>
                     </div>
 
                     {/* --- Winner Declaration --- */}
@@ -374,37 +481,47 @@ export default function Results() {
                         </div>
                     )}
 
-                    {/* --- Participation Summary --- */}
-                    <div className="mb-10">
-                        <div className="flex items-center gap-3 mb-6">
+                    {/* --- System Integrity Report --- */}
+                    <div className="page-break-before mb-10 pt-8">
+                        <div className="flex items-center gap-3 mb-4">
                             <div className="w-1 h-8 bg-slate-900 rounded-full" />
-                            <h3 className="text-xl font-black text-slate-900">ملخص المشاركة</h3>
+                            <h3 className="text-xl font-black text-slate-900">تقرير سلامة النظام</h3>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                                <p className="text-3xl font-black text-slate-900">{totalPossibleVotes.toLocaleString()}</p>
-                                <p className="text-xs text-slate-500 mt-1 font-medium">إجمالي الأصوات الممكنة</p>
-                                <p className="text-[10px] text-slate-400">Total Possible Votes</p>
-                            </div>
-                            <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                                <p className="text-3xl font-black text-slate-900">{totalVotesCast.toLocaleString()}</p>
-                                <p className="text-xs text-slate-500 mt-1 font-medium">إجمالي الأصوات المصوتة</p>
-                                <p className="text-[10px] text-slate-400">Total Votes Cast</p>
-                            </div>
-                            <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
-                                <p className="text-3xl font-black text-emerald-700">{participationRate}%</p>
-                                <p className="text-xs text-emerald-600 mt-1 font-medium">نسبة المشاركة</p>
-                                <p className="text-[10px] text-emerald-500">Participation Rate</p>
-                            </div>
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
+                            <p className="text-sm text-emerald-800 leading-relaxed">
+                                تم إجراء مراجعة لسجلات النظام الإلكتروني بعد انتهاء التصويت، وتبين ما يلي:
+                            </p>
+                            <ul className="mt-3 space-y-2 text-sm text-emerald-700">
+                                <li className="flex items-start gap-2">
+                                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>عدم تسجيل حالات تصويت مكرر.</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>الالتزام بالأوزان التصويتية المحددة لكل مالك.</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>منع التصويت خارج الفترة الزمنية المحددة.</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>حفظ سجل إلكتروني كامل لجميع العمليات.</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>تطابق إجمالي الأصوات مع الوزن التصويتي المحتسب.</span>
+                                </li>
+                            </ul>
                         </div>
                     </div>
 
-                    {/* --- Voter Participation Log (Page Break) --- */}
-                    <div className="page-break-before mt-16 pt-16 border-t-2 border-slate-200">
+                    {/* --- Voter Participation Log (Appendix) --- */}
+                    <div className="mb-10">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-1 h-8 bg-slate-900 rounded-full" />
-                            <h3 className="text-xl font-black text-slate-900">سجل المشاركة المعتمد</h3>
+                            <h3 className="text-xl font-black text-slate-900">ملحق تدقيقي: سجل المشاركة</h3>
                             <span className="mr-auto text-xs text-slate-400 font-medium">
                                 إجمالي المشاركين: {voters.length}
                             </span>
@@ -414,10 +531,10 @@ export default function Results() {
                             <thead>
                                 <tr className="bg-slate-100">
                                     <th className="py-2.5 px-3 font-bold text-slate-600 text-right">#</th>
-                                    <th className="py-2.5 px-3 font-bold text-slate-600 text-right">اسم الناخب</th>
+                                    <th className="py-2.5 px-3 font-bold text-slate-600 text-right">المالك</th>
                                     <th className="py-2.5 px-3 font-bold text-slate-600 text-right">رقم التواصل</th>
-                                    <th className="py-2.5 px-3 font-bold text-slate-600 text-center">الوزن</th>
-                                    <th className="py-2.5 px-3 font-bold text-slate-600 text-right">تفاصيل التصويت</th>
+                                    <th className="py-2.5 px-3 font-bold text-slate-600 text-center">عدد الأصوات</th>
+                                    <th className="py-2.5 px-3 font-bold text-slate-600 text-right">الوحدة ← المرشح</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -438,7 +555,14 @@ export default function Results() {
                                             <div className="flex flex-wrap gap-1.5">
                                                 {v.votes.map((vt, idx) => (
                                                     <span key={idx} className="inline-flex items-center gap-1 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-[10px]">
-                                                        <span className="font-bold text-slate-400">{vt.unit_name}</span>
+                                                        {vt.count > 1 ? (
+                                                            <>
+                                                                <span className="font-bold text-slate-400" title={vt.unit_name}>الوحدات المملوكة</span>
+                                                                <span className="text-amber-600 font-black">×{vt.count}</span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="font-bold text-slate-400">{vt.unit_name}</span>
+                                                        )}
                                                         <span className="text-slate-300">←</span>
                                                         <span className="font-bold text-slate-900">{vt.candidate_name}</span>
                                                     </span>
@@ -451,10 +575,21 @@ export default function Results() {
                         </table>
                     </div>
 
+                    {/* --- System Integrity Note (Admin Voting) --- */}
+                    <div className="mb-10 p-5 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 leading-relaxed">
+                        <p className="font-bold mb-1">تنويه بخصوص الوحدات غير المحولة:</p>
+                        <p>
+                            تُحتسب الأصوات الخاصة بالوحدات غير المحولة بموجب التوكيل الإداري الممنوح لإدارة الجمعية وفق
+            
+                            النظام الأساسي، ويُمارَس هذا الحق حصرًا في الحدود التي لا تتعارض مع حقوق الملاك المنقولين. وقد تم
+                            تضمين هذه الأصوات في الوزن التصويتي الإجمالي، وهي مُدرجة في سجل المشاركة أعلاه تحت اسم
+                            "إدارة سندان".
+                        </p>
+                    </div>
+
                     {/* --- Certification Footer --- */}
                     <div className="mt-20 pt-10 border-t-2 border-slate-200">
                         <div className="flex justify-between items-end">
-                            {/* Right: Certification */}
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2">
                                     <CheckCircle className="w-5 h-5 text-emerald-600" />
@@ -464,12 +599,12 @@ export default function Results() {
                                     </div>
                                 </div>
                                 <div className="space-y-1 text-xs text-slate-400">
-                                    <p>تاريخ التوليد: {formatDate(now)} م</p>
+                                    <p>تاريخ التوليد: {formatDate(now)} م / {toHijri(now)} هـ</p>
                                     <p>رقم المرجع: {docRef}</p>
+                                    <p className="text-[10px] mt-2">تم اعتماد آلية تحقق متعددة العوامل تعتمد على بيانات المالك المسجلة مسبقًا في سجل الناخبين المعتمد، وتشمل بيانات الوحدة والرقم المدني ورقم الهاتف المسجل، مع منع تكرار التصويت وربط كل صوت بسجل انتخابي فريد.</p>
                                 </div>
                             </div>
 
-                            {/* Left: Signature + Stamp */}
                             <div className="text-left space-y-8">
                                 <div className="space-y-2">
                                     <div className="w-52 h-[1px] bg-slate-900 mr-auto" />
@@ -490,36 +625,99 @@ export default function Results() {
             {/* Print Styles */}
             <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
+                    /* Define A4 dimensions and clean page margins */
                     @page {
-                        size: A4;
-                        margin: 20mm 15mm;
+                        size: A4 portrait;
+                        margin: 15mm 15mm;
                     }
-                    body {
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
-                    .page-break-before {
-                        page-break-before: always;
-                        padding-top: 0;
-                        margin-top: 0;
-                        border-top: none;
-                    }
+                    
+                    /* Hide UI Chrome like sidebars, headers, action bars, buttons, and trigger elements */
+                    [data-sidebar="sidebar"],
+                    .sidebar,
+                    header,
+                    aside,
+                    nav,
+                    button,
                     .print\\:hidden {
                         display: none !important;
+                        height: 0 !important;
+                        width: 0 !important;
+                        overflow: hidden !important;
+                        visibility: hidden !important;
                     }
-                    .print\\:px-0 {
-                        padding-left: 0 !important;
-                        padding-right: 0 !important;
+
+                    /* Reset all main layout scrollbars, constraints, flex structures, and heights */
+                    html, 
+                    body, 
+                    #app, 
+                    [data-sidebar="wrapper"],
+                    [data-sidebar="inset"],
+                    main,
+                    .overflow-x-hidden {
+                        overflow: visible !important;
+                        overflow-x: visible !important;
+                        overflow-y: visible !important;
+                        height: auto !important;
+                        min-height: auto !important;
+                        max-height: none !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-shadow: none !important;
+                        background: white !important;
+                        width: 100% !important;
+                        position: static !important;
+                        display: block !important;
                     }
-                    .print\\:py-0 {
+
+                    body {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+
+                    /* Clean content heights */
+                    .min-h-screen {
+                        min-height: 0 !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+
+                    /* Force page breaks at designated points */
+                    .page-break-before {
+                        page-break-before: always !important;
+                        break-before: always !important;
                         padding-top: 0 !important;
-                        padding-bottom: 0 !important;
+                        margin-top: 0 !important;
+                        border-top: none !important;
                     }
+
+                    /* Keep tables, rows, cards, and warnings whole - do not break them halfway across pages */
+                    tr, 
+                    table, 
+                    .bg-slate-50, 
+                    .bg-amber-50, 
+                    .bg-emerald-50, 
+                    .border, 
+                    .border-2, 
+                    .rounded-xl {
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+
+                    /* Repeat table headers when tables span multiple pages for easier reading */
+                    thead {
+                        display: table-header-group !important;
+                    }
+
+                    /* Hide any browser scrollbars on body/containers */
+                    ::-webkit-scrollbar {
+                        display: none !important;
+                    }
+                    body {
+                        scrollbar-width: none !important;
+                    }
+                    
                     .print\\:border-b {
                         border-bottom-width: 1px !important;
-                    }
-                    @page :first {
-                        margin-top: 15mm;
                     }
                 }
             `}} />

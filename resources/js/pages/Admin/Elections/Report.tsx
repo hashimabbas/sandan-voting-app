@@ -19,11 +19,17 @@ interface Result {
     votes_count: number;
 }
 
+interface VoteEntry {
+    candidate_name: string;
+    unit_name: string;
+    count: number;
+}
+
 interface VoterLog {
     name: string;
     phone: string;
     weight: number;
-    votes: { candidate_name: string; unit_name: string }[];
+    votes: VoteEntry[];
 }
 
 interface ReportProps {
@@ -175,7 +181,14 @@ export default function Report() {
                                     <div className="flex flex-wrap gap-2">
                                         {v.votes.map((vt, idx) => (
                                             <div key={idx} className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded">
-                                                <span className="font-black text-slate-400">#{vt.unit_name}</span>
+                                                {vt.count > 1 ? (
+                                                    <>
+                                                        <span className="font-black text-slate-400">{vt.unit_name ? 'Multiple Units' : 'N/A'}</span>
+                                                        <span className="font-black text-amber-600">×{vt.count}</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="font-black text-slate-400">#{vt.unit_name}</span>
+                                                )}
                                                 <span className="w-1 h-1 rounded-full bg-slate-300" />
                                                 <span className="font-bold text-slate-900">{vt.candidate_name}</span>
                                             </div>

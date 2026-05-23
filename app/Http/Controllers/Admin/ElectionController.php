@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Election;
 use App\Models\Voter;
 use App\Models\Candidate;
+use App\Models\Unit;
 use App\Models\Vote;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -306,31 +307,15 @@ class ElectionController extends Controller
 
         $resultsData = $this->getVotingResultsData($election);
 
-        // Get all votes for the participation log
-        $allVotes = Vote::where('election_id', $election->id)
-            ->with(['voter', 'candidate', 'unit'])
-            ->get();
-
-        $participationLog = $allVotes->groupBy(function($vote) {
-            return $vote->voter_id ? ('voter_' . $vote->voter_id) : 'system_admin';
-        })->map(function($votes, $key) {
-            $first = $votes->first();
-            return [
-                'name' => $first->voter ? $first->voter->name : 'System/Admin (Proxy)',
-                'phone' => $first->voter ? $first->voter->phone : 'N/A',
-                'weight' => $votes->count(),
-                'votes' => $votes->map(fn($v) => [
-                    'candidate_name' => $v->candidate->name ?? 'Deleted Candidate',
-                    'unit_name' => $v->unit->unit_name ?? 'N/A'
-                ])
-            ];
-        })->values();
+        $participationLog = $this->buildParticipationLog($election);
 
         return Inertia::render('Admin/Elections/Results', [
             'election' => $election->toArray(),
             'results' => $resultsData['results'],
             'totalPossibleVotes' => $resultsData['totalPossibleVotes'],
             'totalVotesCast' => $resultsData['totalVotesCast'],
+            'transferredWeight' => $resultsData['transferredWeight'],
+            'untransferredCount' => $resultsData['untransferredCount'],
             'voters' => $participationLog,
             'generated_at' => now()->toDateTimeString(),
             'breadcrumbs' => [
@@ -346,33 +331,16 @@ class ElectionController extends Controller
         $this->authorize('viewElections');
 
         $resultsData = $this->getVotingResultsData($election);
-        
-        // Get all votes for the election, including those without a voter_id (Admin Proxy)
-        $allVotes = Vote::where('election_id', $election->id)
-            ->with(['voter', 'candidate', 'unit'])
-            ->get();
 
-        // Group votes by voter (or 'System/Admin' if voter_id is null)
-        $participationLog = $allVotes->groupBy(function($vote) {
-            return $vote->voter_id ? ('voter_' . $vote->voter_id) : 'system_admin';
-        })->map(function($votes, $key) {
-            $first = $votes->first();
-            return [
-                'name' => $first->voter ? $first->voter->name : 'System/Admin (Proxy)',
-                'phone' => $first->voter ? $first->voter->phone : 'N/A',
-                'weight' => $votes->count(),
-                'votes' => $votes->map(fn($v) => [
-                    'candidate_name' => $v->candidate->name ?? 'Deleted Candidate',
-                    'unit_name' => $v->unit->unit_name ?? 'N/A'
-                ])
-            ];
-        })->values();
+        $participationLog = $this->buildParticipationLog($election);
 
         return Inertia::render('Admin/Elections/Report', [
             'election' => $election->toArray(),
             'results' => $resultsData['results'],
             'totalPossibleVotes' => $resultsData['totalPossibleVotes'],
             'totalVotesCast' => $resultsData['totalVotesCast'],
+            'transferredWeight' => $resultsData['transferredWeight'],
+            'untransferredCount' => $resultsData['untransferredCount'],
             'voters' => $participationLog,
             'generated_at' => now()->toDateTimeString(),
         ]);
@@ -463,6 +431,78 @@ class ElectionController extends Controller
     }
 
     /**
+     * Count units eligible for admin proxy voting (untransferred ownership).
+     */
+    protected function getUntransferredUnitsCount(Election $election): int
+    {
+        $eligibleUnitNames = [];
+        $voters = Voter::where('election_id', $election->id)->get();
+        foreach ($voters as $voter) {
+            if ($voter->unit_name) {
+                foreach (array_map('trim', explode(',', $voter->unit_name)) as $part) {
+                    if (!empty($part)) $eligibleUnitNames[] = $part;
+                }
+            }
+        }
+        $eligibleUnitNames = array_unique($eligibleUnitNames);
+
+        return Unit::whereNotIn('unit_name', $eligibleUnitNames)
+            ->where(function($q) {
+                $q->where('ownership_status', '!=', 'محولة')
+                  ->where('ownership_status', '!=', 'transferred')
+                  ->orWhereNull('ownership_status')
+                  ->orWhere('ownership_status', '');
+            })->count();
+    }
+
+    /**
+     * Build participation log from votes, grouped by voter.
+     */
+    protected function buildParticipationLog(Election $election): \Illuminate\Support\Collection
+    {
+        $allVotes = Vote::where('election_id', $election->id)
+            ->with(['voter', 'candidate', 'unit'])
+            ->get();
+
+        return $allVotes->groupBy(function($vote) {
+            return $vote->voter_id ? ('voter_' . $vote->voter_id) : 'system_admin';
+        })->map(function($votes) {
+            $first = $votes->first();
+            $isAdmin = is_null($first->voter_id);
+
+            $unitNames = [];
+            if ($first->voter && $first->voter->unit_name) {
+                $unitNames = array_map('trim', explode(',', $first->voter->unit_name));
+            }
+
+            if ($isAdmin) {
+                // Admin votes: each has a specific unit_id, show per-vote
+                $entries = $votes->map(fn($v) => [
+                    'candidate_name' => $v->candidate->name ?? 'Deleted Candidate',
+                    'unit_name' => $v->unit ? $v->unit->unit_name : 'N/A',
+                    'count' => 1,
+                ]);
+            } else {
+                // Owner votes: no unit_id on records, aggregate by candidate
+                $entries = $votes->groupBy('candidate_id')->map(function($cv) use ($unitNames) {
+                    return [
+                        'candidate_name' => $cv->first()->candidate->name ?? 'Deleted Candidate',
+                        'unit_name' => !empty($unitNames) ? implode(', ', $unitNames) : '',
+                        'count' => $cv->count(),
+                    ];
+                })->values();
+            }
+
+            return [
+                'name' => $first->voter ? $first->voter->name : 'إدارة سندان (تصويت بالإنابة)',
+                'phone' => $first->voter ? $first->voter->phone : 'N/A',
+                'weight' => $votes->count(),
+                'votes' => $entries,
+            ];
+        })->values();
+    }
+
+    /**
      * Helper to get common voting results data for a specific election, with caching.
      */
     protected function getVotingResultsData(Election $election): array
@@ -482,13 +522,17 @@ class ElectionController extends Controller
                                     ];
                                 });
 
-            $totalPossibleVotes = Voter::where('election_id', $election->id)->sum('number_of_units');
-            $totalVotesCast = Vote::where('election_id', $election->id)->sum('vote_weight');
+            $transferredWeight = (int) Voter::where('election_id', $election->id)->sum('number_of_units');
+            $untransferredCount = $this->getUntransferredUnitsCount($election);
+            $totalPossibleVotes = $transferredWeight + $untransferredCount;
+            $totalVotesCast = (int) Vote::where('election_id', $election->id)->sum('vote_weight');
 
             return [
                 'results' => $results,
-                'totalPossibleVotes' => (int) $totalPossibleVotes,
-                'totalVotesCast' => (int) $totalVotesCast,
+                'totalPossibleVotes' => $totalPossibleVotes,
+                'totalVotesCast' => $totalVotesCast,
+                'transferredWeight' => $transferredWeight,
+                'untransferredCount' => $untransferredCount,
             ];
         });
     }

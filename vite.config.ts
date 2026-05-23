@@ -6,11 +6,11 @@ import { resolve } from 'node:path';
 import path from 'path';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
-            ssr: 'resources/js/ssr.tsx',
+            ssr: mode === 'production' ? 'resources/js/ssr.tsx' : false,
             refresh: true,
         }),
         react(),
@@ -24,10 +24,24 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            // Make sure this alias points to your resources/js directory correctly
-            // If your pages are in `resources/js/Pages`, this is implicitly handled.
             'ziggy-js': resolve(__dirname, 'vendor/tightenco/ziggy'),
             '@': path.resolve(__dirname, './resources/js'),
         },
     },
-});
+    build: {
+        sourcemap: false,
+        rollupOptions: {
+            output: {
+                manualChunks: undefined,
+            },
+        },
+    },
+    server: {
+        hmr: {
+            overlay: false,
+        },
+        watch: {
+            usePolling: false,
+        },
+    },
+}));
